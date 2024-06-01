@@ -12,6 +12,7 @@ import spring.event.ProductCreatedEvent;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 @Service
 public class ProductServiceImpl implements ProductService{
@@ -19,7 +20,7 @@ public class ProductServiceImpl implements ProductService{
     private KafkaTemplate<String, ProductCreatedEvent> kafkaTemplate;
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     @Override
-    public String createProduct(CreateProductDtro createProductDtro) {
+    public String createProduct(CreateProductDtro createProductDtro) throws ExecutionException, InterruptedException {
         //TODO save to DB
 
         String productId = UUID.randomUUID().toString();
@@ -29,17 +30,14 @@ public class ProductServiceImpl implements ProductService{
                 createProductDtro.getPrice(),
                 createProductDtro.getQuantity());
 
-        CompletableFuture<SendResult<String, ProductCreatedEvent>> future = kafkaTemplate
-                .send("product-createdJava-events-topic", productId, productCreatedEvent);
 
-        future.whenComplete((res, ex) -> {
-            if(ex != null){
-                logger.error("Failed to send massage: {}", ex.getMessage());
-            } else {
-                logger.info("Message send successfully: {}", res.getRecordMetadata());
-            }
-        });
+        SendResult<String, ProductCreatedEvent> result = kafkaTemplate
+                .send("product-createdJava-events-topic", productId, productCreatedEvent).get();
 
+
+        logger.info("topic: {}", result.getRecordMetadata().topic());
+        logger.info("partition: {}", result.getRecordMetadata().partition());
+        logger.info("offset: {}", result.getRecordMetadata().offset());
         logger.info("Return: {}", productId);
         return productId;
     }
